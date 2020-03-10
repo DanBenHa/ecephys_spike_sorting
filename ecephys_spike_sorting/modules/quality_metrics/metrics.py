@@ -88,7 +88,8 @@ def calculate_metrics(spike_times, spike_clusters, spike_templates, amplitudes, 
         
 
         print("Calculating silhouette score")
-        the_silhouette_score = calculate_silhouette_score(spike_clusters[in_epoch], 
+        the_silhouette_score = calculate_silhouette_score(spike_clusters[in_epoch],
+                                                       spike_templates[in_epoch],
                                                        total_units,
                                                        pc_features[in_epoch,:,:],
                                                        pc_feature_ind,
@@ -308,7 +309,8 @@ def calculate_pc_metrics(spike_clusters,
     return isolation_distances, l_ratios, d_primes, nn_hit_rates, nn_miss_rates 
 
 
-def calculate_silhouette_score(spike_clusters, 
+def calculate_silhouette_score(spike_clusters,
+                                 spike_templates,
                                  total_units,
                                  pc_features, 
                                  pc_feature_ind,
@@ -322,33 +324,34 @@ def calculate_silhouette_score(spike_clusters,
     all_pcs = np.zeros((total_spikes, num_channels * num_pc_features))
 
     for idx, i in enumerate(random_spike_inds):
-        
-        unit_id = spike_clusters[i]
-        channels = pc_feature_ind[unit_id,:]
-        
+
+        template_id = spike_templates[i]
+        channels = pc_feature_ind[template_id,:]
+
         for j in range(0,num_pc_features):
             all_pcs[idx, channels + num_channels * j] = pc_features[i,j,:]
 
     cluster_labels = spike_clusters[random_spike_inds]
 
     cluster_ids = np.unique(cluster_labels)
+    cluster_ind_all = np.flatnonzero(np.isin(np.unique(spike_clusters), cluster_ids))
 
     SS = np.empty((total_units, total_units))
     SS[:] = np.nan
 
-    for idx1, i in enumerate(cluster_ids):
+    for count, (i, i_all) in enumerate(zip(cluster_ids, cluster_ind_all)):
 
-        printProgressBar(idx1+1, len(cluster_ids))
-        
-        for idx2, j in enumerate(cluster_ids):
-            
+        printProgressBar(count+1, len(cluster_ids))
+
+        for j, j_all in zip(cluster_ids, cluster_ind_all):
+
             if j > i:
                 inds = np.in1d(cluster_labels, np.array([i,j]))
                 X = all_pcs[inds,:]
                 labels = cluster_labels[inds]
                 
                 if len(labels) > 2:
-                    SS[i,j] = silhouette_score(X, labels)
+                    SS[i_all,j_all] = silhouette_score(X, labels)
 
     with warnings.catch_warnings():
       warnings.simplefilter("ignore")
